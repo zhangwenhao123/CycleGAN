@@ -8,7 +8,9 @@ from PIL import Image
 import time
 import random
 import sys
-
+import os
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+# CUDA_VISIBLE_DEVICES = 0
 
 from layers import *
 from model import *
@@ -53,9 +55,9 @@ class CycleGAN():
         self.image_A/self.image_B -> Input image with each values ranging from [-1,1]
         '''
 
-        filenames_A = tf.train.match_filenames_once("./input/horse2zebra/trainA/*.jpg")    
+        filenames_A = tf.train.match_filenames_once("./input/ae_photos/testA/*.jpg")    
         self.queue_length_A = tf.size(filenames_A)
-        filenames_B = tf.train.match_filenames_once("./input/horse2zebra/trainB/*.jpg")    
+        filenames_B = tf.train.match_filenames_once("./input/ae_photos/testB/*.jpg")    
         self.queue_length_B = tf.size(filenames_B)
         
         filename_queue_A = tf.train.string_input_producer(filenames_A)
@@ -96,12 +98,12 @@ class CycleGAN():
 
         for i in range(max_images): 
             image_tensor = sess.run(self.image_A)
-            if(image_tensor.size() == img_size*batch_size*img_layer):
+            if(image_tensor.size == img_size*batch_size*img_layer):
                 self.A_input[i] = image_tensor.reshape((batch_size,img_height, img_width, img_layer))
 
         for i in range(max_images):
             image_tensor = sess.run(self.image_B)
-            if(image_tensor.size() == img_size*batch_size*img_layer):
+            if(image_tensor.size == img_size*batch_size*img_layer):
                 self.B_input[i] = image_tensor.reshape((batch_size,img_height, img_width, img_layer))
 
 
@@ -186,7 +188,7 @@ class CycleGAN():
         self.g_A_trainer = optimizer.minimize(g_loss_A, var_list=g_A_vars)
         self.g_B_trainer = optimizer.minimize(g_loss_B, var_list=g_B_vars)
 
-        for var in self.model_vars: print(var.name)
+        # for var in self.model_vars: print(var.name)
 
         #Summary variables for tensorboard
 
@@ -244,7 +246,7 @@ class CycleGAN():
         self.loss_calc()
       
         # Initializing the global variables
-        init = tf.global_variables_initializer()
+        init = [tf.global_variables_initializer() ,tf.local_variables_initializer()]
         saver = tf.train.Saver()     
 
         with tf.Session() as sess:
@@ -258,7 +260,7 @@ class CycleGAN():
                 chkpt_fname = tf.train.latest_checkpoint(check_dir)
                 saver.restore(sess, chkpt_fname)
 
-            writer = tf.summary.FileWriter("./output/2")
+            writer = tf.summary.FileWriter("./output/logs")
 
             if not os.path.exists(check_dir):
                 os.makedirs(check_dir)
