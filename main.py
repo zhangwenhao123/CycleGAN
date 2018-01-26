@@ -3,13 +3,13 @@ from tensorflow.examples.tutorials.mnist import input_data
 import numpy as np
 from scipy.misc import imsave
 import os
+os.environ["CUDA_VISIBLE_DEVICES"]="3"
 import shutil
 from PIL import Image
 import time
 import random
 import sys
-import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+# os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 # CUDA_VISIBLE_DEVICES = 0
 
 from layers import *
@@ -23,13 +23,11 @@ img_size = img_height * img_width
 to_train = True
 to_test = False
 to_restore = False
-output_path = "./output"
-check_dir = "./output/checkpoints/"
+output_path = "./output/self-photoed/"
+check_dir = output_path+"checkpoints/"
 
 
 temp_check = 0
-
-
 
 max_epoch = 1
 max_images = 100
@@ -55,9 +53,9 @@ class CycleGAN():
         self.image_A/self.image_B -> Input image with each values ranging from [-1,1]
         '''
 
-        filenames_A = tf.train.match_filenames_once("./input/ae_photos/testA/*.jpg")    
+        filenames_A = tf.train.match_filenames_once("./input/A/*.jpg")    
         self.queue_length_A = tf.size(filenames_A)
-        filenames_B = tf.train.match_filenames_once("./input/ae_photos/testB/*.jpg")    
+        filenames_B = tf.train.match_filenames_once("./input/B/*.JPG")    
         self.queue_length_B = tf.size(filenames_B)
         
         filename_queue_A = tf.train.string_input_producer(filenames_A)
@@ -69,7 +67,9 @@ class CycleGAN():
 
         self.image_A = tf.subtract(tf.div(tf.image.resize_images(tf.image.decode_jpeg(image_file_A),[256,256]),127.5),1)
         self.image_B = tf.subtract(tf.div(tf.image.resize_images(tf.image.decode_jpeg(image_file_B),[256,256]),127.5),1)
-
+        #self.image_A = tf.subtract(tf.div(tf.image.resize_images(tf.image.decode_image(image_file_A,channels =3),[256,256]),127.5),1)
+        #self.image_B = tf.subtract(tf.div(tf.image.resize_images(tf.image.decode_image(image_file_B,channels =3),[256,256]),127.5),1)
+        
     
 
     def input_read(self, sess):
@@ -139,6 +139,7 @@ class CycleGAN():
             self.fake_B = build_generator_resnet_9blocks(self.input_A, name="g_A")
             self.fake_A = build_generator_resnet_9blocks(self.input_B, name="g_B")
             self.rec_A = build_gen_discriminator(self.input_A, "d_A")
+            # print (self.rec_A)
             self.rec_B = build_gen_discriminator(self.input_B, "d_B")
 
             scope.reuse_variables()
@@ -188,6 +189,8 @@ class CycleGAN():
         self.g_A_trainer = optimizer.minimize(g_loss_A, var_list=g_A_vars)
         self.g_B_trainer = optimizer.minimize(g_loss_B, var_list=g_B_vars)
 
+        print ("***",disc_loss_A,d_loss_A)
+
         # for var in self.model_vars: print(var.name)
 
         #Summary variables for tensorboard
@@ -199,17 +202,17 @@ class CycleGAN():
 
     def save_training_images(self, sess, epoch):
 
-        if not os.path.exists("./output/imgs"):
-            os.makedirs("./output/imgs")
+        if not os.path.exists(output_path+"imgs"):
+            os.makedirs(output_path+"imgs")
 
         for i in range(0,10):
             fake_A_temp, fake_B_temp, cyc_A_temp, cyc_B_temp = sess.run([self.fake_A, self.fake_B, self.cyc_A, self.cyc_B],feed_dict={self.input_A:self.A_input[i], self.input_B:self.B_input[i]})
-            imsave("./output/imgs/fakeB_"+ str(epoch) + "_" + str(i)+".jpg",((fake_A_temp[0]+1)*127.5).astype(np.uint8))
-            imsave("./output/imgs/fakeA_"+ str(epoch) + "_" + str(i)+".jpg",((fake_B_temp[0]+1)*127.5).astype(np.uint8))
-            imsave("./output/imgs/cycA_"+ str(epoch) + "_" + str(i)+".jpg",((cyc_A_temp[0]+1)*127.5).astype(np.uint8))
-            imsave("./output/imgs/cycB_"+ str(epoch) + "_" + str(i)+".jpg",((cyc_B_temp[0]+1)*127.5).astype(np.uint8))
-            imsave("./output/imgs/inputA_"+ str(epoch) + "_" + str(i)+".jpg",((self.A_input[i][0]+1)*127.5).astype(np.uint8))
-            imsave("./output/imgs/inputB_"+ str(epoch) + "_" + str(i)+".jpg",((self.B_input[i][0]+1)*127.5).astype(np.uint8))
+            imsave(output_path+"imgs/fakeB_"+ str(epoch) + "_" + str(i)+".jpg",((fake_A_temp[0]+1)*127.5).astype(np.uint8))
+            imsave(output_path+"imgs/fakeA_"+ str(epoch) + "_" + str(i)+".jpg",((fake_B_temp[0]+1)*127.5).astype(np.uint8))
+            imsave(output_path+"imgs/cycA_"+ str(epoch) + "_" + str(i)+".jpg",((cyc_A_temp[0]+1)*127.5).astype(np.uint8))
+            imsave(output_path+"imgs/cycB_"+ str(epoch) + "_" + str(i)+".jpg",((cyc_B_temp[0]+1)*127.5).astype(np.uint8))
+            imsave(output_path+"imgs/inputA_"+ str(epoch) + "_" + str(i)+".jpg",((self.A_input[i][0]+1)*127.5).astype(np.uint8))
+            imsave(output_path+"imgs/inputB_"+ str(epoch) + "_" + str(i)+".jpg",((self.B_input[i][0]+1)*127.5).astype(np.uint8))
 
     def fake_image_pool(self, num_fakes, fake, fake_pool):
         ''' This function saves the generated image to corresponding pool of images.
@@ -260,7 +263,7 @@ class CycleGAN():
                 chkpt_fname = tf.train.latest_checkpoint(check_dir)
                 saver.restore(sess, chkpt_fname)
 
-            writer = tf.summary.FileWriter("./output/logs")
+            writer = tf.summary.FileWriter(output_path+"logs")
 
             if not os.path.exists(check_dir):
                 os.makedirs(check_dir)
@@ -340,15 +343,15 @@ class CycleGAN():
             chkpt_fname = tf.train.latest_checkpoint(check_dir)
             saver.restore(sess, chkpt_fname)
 
-            if not os.path.exists("./output/imgs/test/"):
-                os.makedirs("./output/imgs/test/")            
+            if not os.path.exists(output_path+"imgs/test/"):
+                os.makedirs(output_path+"imgs/test/")            
 
             for i in range(0,100):
                 fake_A_temp, fake_B_temp = sess.run([self.fake_A, self.fake_B],feed_dict={self.input_A:self.A_input[i], self.input_B:self.B_input[i]})
-                imsave("./output/imgs/test/fakeB_"+str(i)+".jpg",((fake_A_temp[0]+1)*127.5).astype(np.uint8))
-                imsave("./output/imgs/test/fakeA_"+str(i)+".jpg",((fake_B_temp[0]+1)*127.5).astype(np.uint8))
-                imsave("./output/imgs/test/inputA_"+str(i)+".jpg",((self.A_input[i][0]+1)*127.5).astype(np.uint8))
-                imsave("./output/imgs/test/inputB_"+str(i)+".jpg",((self.B_input[i][0]+1)*127.5).astype(np.uint8))
+                imsave(output_path+"imgs/test/fakeB_"+str(i)+".jpg",((fake_A_temp[0]+1)*127.5).astype(np.uint8))
+                imsave(output_path+"imgs/test/fakeA_"+str(i)+".jpg",((fake_B_temp[0]+1)*127.5).astype(np.uint8))
+                imsave(output_path+"imgs/test/inputA_"+str(i)+".jpg",((self.A_input[i][0]+1)*127.5).astype(np.uint8))
+                imsave(output_path+"imgs/test/inputB_"+str(i)+".jpg",((self.B_input[i][0]+1)*127.5).astype(np.uint8))
 
 
 def main():
